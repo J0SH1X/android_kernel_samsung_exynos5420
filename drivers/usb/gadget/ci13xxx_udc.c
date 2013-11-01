@@ -67,7 +67,6 @@
 
 #include "ci13xxx_udc.h"
 
-
 /******************************************************************************
  * DEFINE
  *****************************************************************************/
@@ -349,7 +348,21 @@ static int hw_device_reset(struct ci13xxx *udc)
  */
 static int hw_device_state(u32 dma)
 {
+	struct ci13xxx *udc = _udc;
+	struct usb_gadget *gadget = &udc->gadget;
+
 	if (dma) {
+		if (gadget->streaming_enabled || !(udc->udc_driver->flags &
+				CI13XXX_DISABLE_STREAMING)) {
+			hw_cwrite(CAP_USBMODE, USBMODE_SDIS, 0);
+			pr_debug("%s(): streaming mode is enabled. USBMODE:%x\n",
+				 __func__, hw_cread(CAP_USBMODE, ~0));
+		} else {
+			hw_cwrite(CAP_USBMODE, USBMODE_SDIS, USBMODE_SDIS);
+			pr_debug("%s(): streaming mode is disabled. USBMODE:%x\n",
+				__func__, hw_cread(CAP_USBMODE, ~0));
+
+		}
 		hw_cwrite(CAP_ENDPTLISTADDR, ~0, dma);
 		/* interrupt, error, port change, reset, sleep/suspend */
 		hw_cwrite(CAP_USBINTR, ~0,

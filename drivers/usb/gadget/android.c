@@ -1588,12 +1588,30 @@ android_unbind_enabled_functions(struct android_dev *dev,
 			f_holder->f->unbind_config(f_holder->f, c);
 	}
 }
+static inline void check_streaming_func(struct usb_gadget *gadget,
+		struct android_usb_platform_data *pdata,
+		char *name)
+{
+	int i;
 
-static int android_enable_function(struct android_dev *dev, char *name)
+	for (i = 0; i < pdata->streaming_func_count; i++) {
+		if (!strcmp(name, pdata->streaming_func[i])) {
+			pr_debug("set streaming_enabled to true\n");
+			gadget->streaming_enabled = true;
+			break;
+		}
+	}
+}
+static int android_enable_function(struct android_dev *dev,
+				   struct android_configuration *conf,
+				   char *name)
 {
 	struct android_usb_function **functions = dev->functions;
 	struct android_usb_function *f;
 	struct android_usb_function_holder *f_holder;
+	struct android_usb_platform_data *pdata = dev->pdata;
+	struct usb_gadget *gadget = dev->cdev->gadget;
+
 	while ((f = *functions++)) {
 		if (!strcmp(name, f->name)) {
 			if (f->android_dev && f->android_dev != dev)
@@ -1611,6 +1629,13 @@ static int android_enable_function(struct android_dev *dev, char *name)
 				f_holder->f = f;
 				list_add_tail(&f_holder->enabled_list,
 					      &conf->enabled_functions);
+				pr_debug("func:%s is enabled.\n", f->name);
+				/*
+				 * compare enable function with streaming func
+				 * list and based on the same request streaming.
+				 */
+				check_streaming_func(gadget, pdata, f->name);
+
 				return 0;
 			}
 		}
@@ -2187,6 +2212,10 @@ static void android_unbind_config(struct usb_configuration *c)
 {
 	struct android_dev *dev = _android_dev;
 
+	if (c->cdev->gadget->streaming_enabled) {
+		c->cdev->gadget->streaming_enabled = false;
+		pr_debug("setting streaming_enabled to false.\n");
+	}
 	android_unbind_enabled_functions(dev, c);
 }
 
